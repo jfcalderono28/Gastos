@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import MonthSelector from '../../components/MonthSelector'
 import TransactionForm from './TransactionForm'
 import TransferirForm from '../bolsillos/TransferirForm'
-import { useAhorroId, useBolsillos, useCategories, useDebts, useMoneda, useTransactions, useTxColors } from '../../hooks/data'
-import type { Category, Transaction } from '../../data/db'
+import Modal from '../../components/Modal'
+import { useAhorroId, useBolsillos, useCategories, useDebts, useListasMercado, useMoneda, useTransactions, useTxColors } from '../../hooks/data'
+import type { Category, ListaMercado, Transaction } from '../../data/db'
 import { esDelMes, fechaCorta } from '../../lib/dates'
 import { formatMoney } from '../../lib/format'
 
@@ -23,6 +24,9 @@ export default function TransactionsPage({
   const ahorroId = useAhorroId()
   const [form, setForm] = useState<{ abierto: boolean; editar?: Transaction }>({ abierto: false })
   const [filtro, setFiltro] = useState<'todos' | 'ingreso' | 'gasto'>('todos')
+  const [verListaId, setVerListaId] = useState<number | null>(null)
+  const listas = useListasMercado()
+  const listasPorId = useMemo(() => new Map(listas.map(l => [l.id!, l])), [listas])
   const [bolsilloFiltro, setBolsilloFiltro] = useState<number | 'todos'>('todos')
   const [transferir, setTransferir] = useState(false)
   const [diaFiltro, setDiaFiltro] = useState<string | null>(null)
@@ -264,9 +268,21 @@ export default function TransactionsPage({
                             {t.nota ? (t.subcategoria ? ` · ${t.nota}` : t.nota) : ''}
                           </div>
                         </div>
-                        <div className="shrink-0 font-semibold">
-                          {t.tipo === 'ingreso' ? '+' : '-'}
-                          {formatMoney(t.monto, moneda)}
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {t.listaId && listasPorId.has(t.listaId) && (
+                            <button
+                              onClick={e => { e.stopPropagation(); setVerListaId(t.listaId!) }}
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-sm"
+                              style={{ backgroundColor: (textColor) + '33' }}
+                              title="Ver lista de mercado"
+                            >
+                              🛒
+                            </button>
+                          )}
+                          <span className="font-semibold">
+                            {t.tipo === 'ingreso' ? '+' : '-'}
+                            {formatMoney(t.monto, moneda)}
+                          </span>
                         </div>
                       </li>
                     )
@@ -314,6 +330,13 @@ export default function TransactionsPage({
         />
       )}
 
+      {verListaId !== null && (
+        <VerListaMercadoModal
+          lista={listasPorId.get(verListaId) ?? null}
+          moneda={moneda}
+          onClose={() => setVerListaId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -384,6 +407,62 @@ function CalendarioMes({
         })}
       </div>
     </div>
+  )
+}
+
+function VerListaMercadoModal({
+  lista,
+  moneda,
+  onClose,
+}: {
+  lista: ListaMercado | null
+  moneda: string
+  onClose: () => void
+}) {
+  const itemsVisibles = lista?.items.filter(it => it.nombre.trim() || Number(it.costo) > 0) ?? []
+
+  return (
+    <Modal title={lista?.nombre ?? 'Lista de mercado'} onClose={onClose}>
+      {!lista ? (
+        <div className="py-8 text-center text-slate-400">Cargando…</div>
+      ) : (
+        <div className="space-y-3">
+          <div className="overflow-hidden rounded-xl bg-slate-50 dark:bg-slate-700/50">
+            <div className="grid grid-cols-[1fr_64px_40px_72px] border-b border-slate-200 px-3 py-2 dark:border-slate-600">
+              <span className="text-xs font-semibold text-slate-400">Producto</span>
+              <span className="text-right text-xs font-semibold text-slate-400">Precio</span>
+              <span className="text-center text-xs font-semibold text-slate-400">×</span>
+              <span className="text-right text-xs font-semibold text-slate-400">Total</span>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-600/50">
+              {itemsVisibles.map(it => {
+                const sub = (Number(it.costo) || 0) * (Number(it.cantidad) || 0)
+                return (
+                  <div key={it.id} className="grid grid-cols-[1fr_64px_40px_72px] items-center px-3 py-1.5">
+                    <span className="truncate pr-2 text-sm text-slate-800 dark:text-slate-100">{it.nombre || '—'}</span>
+                    <span className="text-right text-sm tabular-nums text-slate-600 dark:text-slate-300">
+                      {Number(it.costo) > 0 ? formatMoney(Number(it.costo), moneda) : '—'}
+                    </span>
+                    <span className="text-center text-sm text-slate-500">{it.cantidad}</span>
+                    <span className="text-right text-sm font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                      {sub > 0 ? formatMoney(sub, moneda) : '—'}
+                    </span>
+                  </div>
+                )
+              })}
+              {itemsVisibles.length === 0 && (
+                <p className="px-3 py-3 text-sm text-slate-400">Sin productos</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between rounded-xl bg-emerald-600 px-4 py-3 text-white">
+            <span className="text-sm text-emerald-100">{itemsVisibles.length} productos</span>
+            <span className="text-xl font-bold tabular-nums">{formatMoney(lista.total, moneda)}</span>
+          </div>
+        </div>
+      )}
+    </Modal>
   )
 }
 

@@ -6,7 +6,7 @@ import ObligacionesManager from '../obligatorios/ObligacionesManager'
 import Modal from '../../components/Modal'
 import { repo } from '../../data/repository'
 import { seedSiPrimeraVez } from '../../data/seed'
-import { DEFAULT_ORDER, FLASHBAR_ITEMS, useAhorroId, useAhorroPct, useBolsillos, useBolsillosSaldos, useMoneda, useSaldoInicial, useTransactions } from '../../hooks/data'
+import { DEFAULT_ORDER, FLASHBAR_ITEMS, useAhorroId, useAhorroPct, useBolsillos, useBolsillosSaldos, useComprasActivo, useMoneda, useSaldoInicial, useTransactions } from '../../hooks/data'
 import type { FlashBarItem } from '../../hooks/data'
 import { formatMoney } from '../../lib/format'
 import { hoyISO } from '../../lib/dates'
@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const [ayuda, setAyuda] = useState(false)
   const ahorroId = useAhorroId()
   const ahorroPct = useAhorroPct()
+  const comprasActivo = useComprasActivo()
 
   if (vista === 'categorias') return <CategoriesManager onVolver={() => setVista('menu')} />
   if (vista === 'importar') return <ImportPage onVolver={() => setVista('menu')} />
@@ -46,7 +47,7 @@ export default function SettingsPage() {
         <Opcion icono="🎨" texto="Colores de movimientos" onClick={() => setColoresTx(true)} />
       </ul>
 
-      <ul className="overflow-hidden rounded-xl bg-white shadow-sm dark:bg-slate-800">
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm dark:divide-slate-700 dark:bg-slate-800">
         {ahorroId ? (
           <OpcionConDetalle
             icono="🐷"
@@ -57,6 +58,12 @@ export default function SettingsPage() {
         ) : (
           <Opcion icono="🐷" texto="Activar ahorro" onClick={() => setActivarAhorro(true)} />
         )}
+        <OpcionConDetalle
+          icono="🛒"
+          texto="Compras"
+          detalle={comprasActivo ? 'Activo · reemplaza Presupuestos' : 'Inactivo'}
+          onClick={async () => { await repo.setSetting('comprasActivo', comprasActivo ? '0' : '1') }}
+        />
       </ul>
 
       <ul className="overflow-hidden rounded-xl bg-white shadow-sm dark:bg-slate-800">

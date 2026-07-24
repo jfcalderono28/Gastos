@@ -1,6 +1,6 @@
-export type Tab = 'movimientos' | 'deudas' | 'presupuestos' | 'reportes' | 'ajustes'
+export type Tab = 'movimientos' | 'deudas' | 'presupuestos' | 'reportes' | 'ajustes' | 'compras'
 
-const items: { id: Tab; label: string; icon: string }[] = [
+const BASE_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: 'movimientos', label: 'Movim.', icon: '📒' },
   { id: 'deudas', label: 'Deudas', icon: '💳' },
   { id: 'presupuestos', label: 'Presup.', icon: '🎯' },
@@ -8,13 +8,21 @@ const items: { id: Tab; label: string; icon: string }[] = [
   { id: 'ajustes', label: 'Ajustes', icon: '⚙️' },
 ]
 
+const COMPRAS_ITEM: { id: Tab; label: string; icon: string } = { id: 'compras', label: 'Compras', icon: '🛒' }
+
 export default function BottomNav({
   tab,
   setTab,
+  comprasActivo,
 }: {
   tab: Tab
   setTab: (t: Tab) => void
+  comprasActivo: boolean
 }) {
+  const items = comprasActivo
+    ? BASE_ITEMS.map(it => it.id === 'presupuestos' ? COMPRAS_ITEM : it)
+    : BASE_ITEMS
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
       <div className="mx-auto flex max-w-2xl">

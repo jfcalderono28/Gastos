@@ -1,4 +1,4 @@
-import { db, type Transaction, type Category, type Budget, type Debt, type Obligacion, type Bolsillo } from './db'
+import { db, type Transaction, type Category, type Budget, type Debt, type Obligacion, type Bolsillo, type ListaMercado } from './db'
 
 /**
  * Capa de acceso a datos. La UI SIEMPRE habla con esta interfaz, nunca con
@@ -47,6 +47,13 @@ export interface Repository {
   // Ajustes (clave/valor)
   getSetting(key: string): Promise<string | undefined>
   setSetting(key: string, value: string): Promise<void>
+
+  // Listas de mercado
+  getListasMercado(): Promise<ListaMercado[]>
+  getListaMercado(id: number): Promise<ListaMercado | undefined>
+  addListaMercado(l: Omit<ListaMercado, 'id'>): Promise<number>
+  updateListaMercado(id: number, cambios: Partial<ListaMercado>): Promise<void>
+  deleteListaMercado(id: number): Promise<void>
 
   // Borra TODOS los datos (movimientos, categorías, presupuestos y ajustes)
   borrarTodo(): Promise<void>
@@ -161,10 +168,27 @@ class LocalRepository implements Repository {
     await db.settings.put({ key, value })
   }
 
+  // Listas de mercado
+  getListasMercado() {
+    return db.listaMercado.orderBy('fecha').toArray()
+  }
+  async getListaMercado(id: number) {
+    return db.listaMercado.get(id)
+  }
+  async addListaMercado(l: Omit<ListaMercado, 'id'>) {
+    return db.listaMercado.add(l as ListaMercado)
+  }
+  async updateListaMercado(id: number, cambios: Partial<ListaMercado>) {
+    await db.listaMercado.update(id, cambios)
+  }
+  async deleteListaMercado(id: number) {
+    await db.listaMercado.delete(id)
+  }
+
   async borrarTodo() {
     await db.transaction(
       'rw',
-      [db.transactions, db.categories, db.budgets, db.debts, db.obligaciones, db.bolsillos, db.settings],
+      [db.transactions, db.categories, db.budgets, db.debts, db.obligaciones, db.bolsillos, db.settings, db.listaMercado],
       async () => {
         await db.transactions.clear()
         await db.categories.clear()
@@ -173,6 +197,7 @@ class LocalRepository implements Repository {
         await db.obligaciones.clear()
         await db.bolsillos.clear()
         await db.settings.clear()
+        await db.listaMercado.clear()
       },
     )
   }

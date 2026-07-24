@@ -21,6 +21,26 @@ export interface Transaction {
   nota?: string
   extId?: string // id de origen (CSV) para evitar duplicados al reimportar
   bolsilloId?: number // bolsillo de origen/destino
+  listaId?: number  // referencia a ListaMercado si fue registrado desde Compras
+}
+
+export interface ItemLista {
+  id: string
+  nombre: string
+  costo: string
+  cantidad: string
+  subcategoria?: string
+}
+
+export interface ListaMercado {
+  id?: number
+  nombre: string
+  fecha: string
+  items: ItemLista[]
+  subcategorias?: string[] // secciones de la lista (ej. Lácteos, Carnes…)
+  total: number
+  transaccionId?: number
+  categoriaId?: number // categoría asociada elegida al crear la lista
 }
 
 export interface Budget {
@@ -87,6 +107,7 @@ export class FinanzasDB extends Dexie {
   obligaciones!: Table<Obligacion, number>
   bolsillos!: Table<Bolsillo, number>
   settings!: Table<Setting, string>
+  listaMercado!: Table<ListaMercado, number>
 
   constructor() {
     super('mi-finanzas')
@@ -124,6 +145,11 @@ export class FinanzasDB extends Dexie {
     // v7: categoriaId y subcategoria en deudas
     this.version(7).stores({
       debts: '++id, fechaCreacion, tipo_deuda, categoriaId',
+    })
+    // v8: listas de mercado + listaId en transacciones
+    this.version(8).stores({
+      listaMercado: '++id, fecha',
+      transactions: '++id, tipo, fecha, categoriaId, extId, bolsilloId, listaId',
     })
   }
 }

@@ -88,6 +88,15 @@ export function useFlashBarModoDisponible(): boolean {
   return v === '1'
 }
 
+export function useListasMercado() {
+  return useLiveQuery(() => repo.getListasMercado(), [], [])
+}
+
+export function useComprasActivo(): boolean {
+  const v = useLiveQuery(() => repo.getSetting('comprasActivo'), [], '0') ?? '0'
+  return v === '1'
+}
+
 /** Saldo actual de cada bolsillo débito (excluye crédito y ahorro). */
 export function useBolsillosSaldos(): Map<number, number> {
   const bolsillos = useBolsillos()

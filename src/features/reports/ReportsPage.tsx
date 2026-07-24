@@ -8,6 +8,7 @@ import {
   Bar,
   BarChart,
   XAxis,
+  YAxis,
 } from 'recharts'
 import MonthSelector from '../../components/MonthSelector'
 import { useBolsillos, useCategories, useMoneda, useTransactions } from '../../hooks/data'
@@ -99,6 +100,18 @@ export default function ReportsPage({
       .sort((a, b) => b.fecha.localeCompare(a.fecha))
   }, [base, catDetalle, mes])
 
+  // Agrupación por subcategoría
+  const porSubcategoria = useMemo(() => {
+    const m = new Map<string, number>()
+    txDetalle.forEach((t) => {
+      const key = t.subcategoria || 'General'
+      m.set(key, (m.get(key) ?? 0) + t.monto)
+    })
+    return [...m.entries()]
+      .map(([nombre, valor]) => ({ nombre, valor }))
+      .sort((a, b) => b.valor - a.valor)
+  }, [txDetalle])
+
   const chipBase = 'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors'
   const chipActivo = 'bg-slate-700 text-white'
   const chipInactivo = 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
@@ -138,31 +151,92 @@ export default function ReportsPage({
             </button>
           </div>
           <MonthSelector mes={mes} setMes={setMes} />
+
           {txDetalle.length === 0 ? (
             <p className="py-6 text-center text-slate-400">Sin movimientos este mes.</p>
           ) : (
-            <ul className="mt-3 space-y-2">
-              {txDetalle.map((t) => {
-                const fecha = t.fecha.split('-').reverse().join('/')
-                return (
-                  <li key={t.id} className="flex items-start justify-between gap-2 text-sm">
-                    <div className="min-w-0">
-                      <div className="text-slate-700 dark:text-slate-200 truncate">
-                        {t.subcategoria || catDetalleInfo?.nombre || 'Sin nombre'}
+            <>
+              {/* Gráfica + totales por subcategoría (solo si hay más de una) */}
+              {porSubcategoria.length > 1 && (
+                <div className="mt-4">
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Por subcategoría</h3>
+                  {/* Barras horizontales */}
+                  <div style={{ height: Math.max(100, porSubcategoria.length * 38) }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart layout="vertical" data={porSubcategoria} margin={{ left: 0, right: 40, top: 0, bottom: 0 }}>
+                        <XAxis type="number" hide />
+                        <YAxis
+                          type="category"
+                          dataKey="nombre"
+                          width={90}
+                          tick={{ fontSize: 11, fill: '#94a3b8' }}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <Tooltip
+                          formatter={(v) => formatMoney(Number(v), moneda)}
+                          contentStyle={{ borderRadius: 8, border: 'none', fontSize: 12 }}
+                        />
+                        <Bar dataKey="valor" fill={catDetalleInfo?.color ?? '#6366f1'} radius={[0, 4, 4, 0]}>
+                          {porSubcategoria.map((_, i) => (
+                            <Cell key={i} fill={catDetalleInfo?.color ?? '#6366f1'} fillOpacity={1 - i * 0.12} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Totales por subcategoría */}
+                  <ul className="mt-1 divide-y divide-slate-50 dark:divide-slate-700/40">
+                    {porSubcategoria.map((sub, i) => {
+                      const total = txDetalle.reduce((s, t) => s + ((t.subcategoria || 'General') === sub.nombre ? t.monto : 0), 0)
+                      const pct = txDetalle.reduce((s, t) => s + t.monto, 0)
+                      return (
+                        <li key={i} className="flex items-center justify-between py-1.5 text-sm">
+                          <span className="text-slate-600 dark:text-slate-300">{sub.nombre}</span>
+                          <div className="text-right">
+                            <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+                              {formatMoney(total, moneda)}
+                            </span>
+                            <span className="ml-2 text-xs text-slate-400">
+                              {pct ? Math.round((total / pct) * 100) : 0}%
+                            </span>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <div className="my-3 border-t border-slate-100 dark:border-slate-700" />
+                </div>
+              )}
+
+              {/* Lista individual de transacciones */}
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {porSubcategoria.length > 1 ? 'Movimientos' : 'Detalle'}
+              </h3>
+              <ul className="space-y-2">
+                {txDetalle.map((t) => {
+                  const fecha = t.fecha.split('-').reverse().join('/')
+                  return (
+                    <li key={t.id} className="flex items-start justify-between gap-2 text-sm">
+                      <div className="min-w-0">
+                        <div className="truncate text-slate-700 dark:text-slate-200">
+                          {t.subcategoria || catDetalleInfo?.nombre || 'Sin nombre'}
+                        </div>
+                        {t.nota && (
+                          <div className="truncate text-xs text-slate-400">{t.nota}</div>
+                        )}
+                        <div className="text-xs text-slate-400">{fecha}</div>
                       </div>
-                      {t.nota && (
-                        <div className="text-xs text-slate-400 truncate">{t.nota}</div>
-                      )}
-                      <div className="text-xs text-slate-400">{fecha}</div>
-                    </div>
-                    <span className={`shrink-0 font-semibold ${t.tipo === 'ingreso' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {t.tipo === 'ingreso' ? '+' : '-'}{formatMoney(t.monto, moneda)}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
+                      <span className={`shrink-0 font-semibold ${t.tipo === 'ingreso' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {t.tipo === 'ingreso' ? '+' : '-'}{formatMoney(t.monto, moneda)}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
           )}
+
           <div className="mt-3 border-t border-slate-100 pt-2 text-right text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
             Total: {formatMoney(txDetalle.reduce((s, t) => s + (t.tipo === 'ingreso' ? t.monto : -t.monto), 0), moneda)}
           </div>
