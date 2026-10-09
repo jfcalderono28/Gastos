@@ -12,6 +12,7 @@ import { formatMoney } from '../../lib/format'
 import { hoyISO } from '../../lib/dates'
 
 import BolsillosManager from '../bolsillos/BolsillosManager'
+import CaptureNotificationsModal from './CaptureNotificationsModal'
 
 type Vista = 'menu' | 'categorias' | 'importar' | 'obligatorios' | 'bolsillos'
 
@@ -23,6 +24,7 @@ export default function SettingsPage() {
   const [ordenarBarra, setOrdenarBarra] = useState(false)
   const [coloresTx, setColoresTx] = useState(false)
   const [ayuda, setAyuda] = useState(false)
+  const [captureNotifs, setCaptureNotifs] = useState(false)
   const ahorroId = useAhorroId()
   const ahorroPct = useAhorroPct()
   const comprasActivo = useComprasActivo()
@@ -45,6 +47,7 @@ export default function SettingsPage() {
         <Opcion icono="💾" texto="Exportar respaldo (CSV)" onClick={exportarRespaldo} />
         <Opcion icono="↕️" texto="Ordenar barra superior" onClick={() => setOrdenarBarra(true)} />
         <Opcion icono="🎨" texto="Colores de movimientos" onClick={() => setColoresTx(true)} />
+        <Opcion icono="🔔" texto="Captura de notificaciones" onClick={() => setCaptureNotifs(true)} />
       </ul>
 
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm dark:divide-slate-700 dark:bg-slate-800">
@@ -87,6 +90,7 @@ export default function SettingsPage() {
       {ajustarSaldo && <AjustarSaldo onClose={() => setAjustarSaldo(false)} />}
       {ordenarBarra && <OrdenarBarra onClose={() => setOrdenarBarra(false)} />}
       {coloresTx && <ColoresTransacciones onClose={() => setColoresTx(false)} />}
+      {captureNotifs && <CaptureNotificationsModal onClose={() => setCaptureNotifs(false)} />}
       {confirmarBorrado && <ConfirmarBorrado onClose={() => setConfirmarBorrado(false)} />}
       {activarAhorro && (
         <ConfigurarAhorro
