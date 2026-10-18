@@ -14,7 +14,10 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
+
+import java.util.HashSet;
 
 @CapacitorPlugin(name = "NotificationCapture")
 public class NotificationPlugin extends Plugin {
@@ -22,8 +25,21 @@ public class NotificationPlugin extends Plugin {
     @Override
     public void load() {
         NotificationCapture.pluginRef = this;
-        // Restore captures from disk if the process was restarted
+        NotificationCapture.loadAllowedPackages(getContext());
         NotificationCapture.loadFromPrefs(getContext());
+    }
+
+    @PluginMethod
+    public void setAllowedPackages(PluginCall call) {
+        try {
+            JSArray arr = call.getArray("packages", new JSArray());
+            HashSet<String> pkgs = new HashSet<>();
+            for (int i = 0; i < arr.length(); i++) pkgs.add(arr.getString(i));
+            NotificationCapture.setAllowedPackages(getContext(), pkgs);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Error setting allowed packages: " + e.getMessage());
+        }
     }
 
     @PluginMethod
@@ -84,6 +100,12 @@ public class NotificationPlugin extends Plugin {
     @PluginMethod
     public void clearCaptures(PluginCall call) {
         NotificationCapture.clearAll(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void scanActiveNotifications(PluginCall call) {
+        NotificationCapture.scanActiveNotifications();
         call.resolve();
     }
 

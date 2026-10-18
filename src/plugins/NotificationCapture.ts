@@ -16,6 +16,8 @@ export interface NotificationCapturePlugin {
   requestBatteryExemption(): Promise<void>
   getCaptures(): Promise<{ captures: NotifCapture[] }>
   clearCaptures(): Promise<void>
+  setAllowedPackages(options: { packages: string[] }): Promise<void>
+  scanActiveNotifications(): Promise<void>
   addListener(
     event: 'notificationReceived',
     fn: (capture: NotifCapture) => void,

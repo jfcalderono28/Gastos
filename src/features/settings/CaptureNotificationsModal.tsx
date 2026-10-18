@@ -395,9 +395,20 @@ export default function CaptureNotificationsModal({ onClose }: { onClose: () => 
     return () => window.removeEventListener('focus', onFocus)
   }, [])
 
+  const [scanning, setScanning] = useState(false)
+
   function handleClear() {
     NotificationCapture.clearCaptures().catch(() => {})
     setCaptures([])
+  }
+
+  async function handleScanActive() {
+    setScanning(true)
+    try {
+      await NotificationCapture.scanActiveNotifications()
+    } finally {
+      setTimeout(() => setScanning(false), 1500)
+    }
   }
 
   return (
@@ -426,11 +437,20 @@ export default function CaptureNotificationsModal({ onClose }: { onClose: () => 
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             Capturando notificaciones
           </span>
-          {captures.length > 0 && (
-            <button onClick={handleClear} className="text-xs text-slate-400 hover:text-rose-500">
-              Limpiar todo
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleScanActive}
+              disabled={scanning}
+              className="text-xs text-sky-500 disabled:opacity-50"
+            >
+              {scanning ? 'Escaneando…' : '🔍 Re-escanear barra'}
             </button>
-          )}
+            {captures.length > 0 && (
+              <button onClick={handleClear} className="text-xs text-slate-400 hover:text-rose-500">
+                Limpiar todo
+              </button>
+            )}
+          </div>
         </div>
       )}
 

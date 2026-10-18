@@ -105,6 +105,12 @@ export function useNotificationProcessor() {
     if (!Capacitor.isNativePlatform()) return
 
     const mapped = bolsillos.filter(b => b.packageName)
+
+    // Sincronizar whitelist con el servicio nativo (filtra en Java antes de guardar nada)
+    NotificationCapture.setAllowedPackages({
+      packages: mapped.map(b => b.packageName!),
+    }).catch(() => {})
+
     if (mapped.length === 0) return
 
     // Procesar capturas que llegaron mientras la app estaba cerrada

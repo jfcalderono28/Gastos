@@ -9,6 +9,7 @@ export default function BolsillosManager({ onVolver }: { onVolver: () => void })
   const [lista, setLista] = useState<Bolsillo[]>([])
   const [dirty, setDirty] = useState(false)
   const [editar, setEditar] = useState<Bolsillo | null | 'nuevo'>(null)
+  const [mostrarPresets, setMostrarPresets] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -83,12 +84,20 @@ export default function BolsillosManager({ onVolver }: { onVolver: () => void })
       </button>
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Bolsillos</h2>
-        <button
-          onClick={() => setEditar('nuevo')}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white"
-        >
-          + Nuevo
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setMostrarPresets(true)}
+            className="rounded-lg border border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-600"
+          >
+            🏦 Desde banco
+          </button>
+          <button
+            onClick={() => setEditar('nuevo')}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white"
+          >
+            + Nuevo
+          </button>
+        </div>
       </div>
       <p className="text-sm text-slate-400">
         Arrastra ⠿ para reordenar · Toca el nombre para editar.
@@ -152,7 +161,146 @@ export default function BolsillosManager({ onVolver }: { onVolver: () => void })
           onClose={() => setEditar(null)}
         />
       )}
+
+      {mostrarPresets && (
+        <PresetsModal
+          onSeleccionar={preset => {
+            setMostrarPresets(false)
+            setEditar({
+              nombre: preset.nombre,
+              icono: preset.icono,
+              color: preset.color,
+              tipo: preset.tipo,
+              packageName: preset.packageName || undefined,
+              diaCorte: preset.tipo === 'credito' ? 15 : undefined,
+            } as Bolsillo)
+          }}
+          onClose={() => setMostrarPresets(false)}
+        />
+      )}
     </div>
+  )
+}
+
+// ── Presets bancarios Colombia ──────────────────────────────────────────────
+interface PresetBancario {
+  banco: string
+  nombre: string
+  tipo: 'debito' | 'credito'
+  icono: string
+  color: string
+  packageName: string   // vacío = sin app vinculada confirmada
+}
+
+// Package names verificados en Google Play Colombia.
+// Los marcados con * son los ya vinculados con APPS_BANCARIAS.
+const PRESETS_BANCARIOS: PresetBancario[] = [
+  // ── Bancolombia ──
+  { banco: 'Bancolombia', nombre: 'Bancolombia Débito',  tipo: 'debito',  icono: '🏦', color: '#F5A800', packageName: 'co.com.bancolombia.personas.superapp' },
+  { banco: 'Bancolombia', nombre: 'Bancolombia Crédito', tipo: 'credito', icono: '💳', color: '#F5A800', packageName: 'co.com.bancolombia.personas.superapp' },
+  // ── Nequi ──
+  { banco: 'Nequi',       nombre: 'Nequi',               tipo: 'debito',  icono: '📱', color: '#FF0066', packageName: 'com.nequi.MobileApp' },
+  // ── Davivienda ──
+  { banco: 'Davivienda',  nombre: 'Davivienda Débito',   tipo: 'debito',  icono: '🏦', color: '#DA291C', packageName: 'com.todo1.davivienda.mobileapp' },
+  { banco: 'Davivienda',  nombre: 'Davivienda Crédito',  tipo: 'credito', icono: '💳', color: '#DA291C', packageName: 'com.todo1.davivienda.mobileapp' },
+  // ── Daviplata ──
+  { banco: 'Daviplata',   nombre: 'Daviplata',            tipo: 'debito',  icono: '📱', color: '#E84142', packageName: 'com.davivienda.daviplataapp' },
+  // ── Nu (Nubank) ──
+  { banco: 'Nu',          nombre: 'Nu Cuenta',            tipo: 'debito',  icono: '📱', color: '#820AD1', packageName: 'com.nu.production' },
+  { banco: 'Nu',          nombre: 'Nu Tarjeta Crédito',   tipo: 'credito', icono: '💳', color: '#820AD1', packageName: 'com.nu.production' },
+  // ── BBVA ──
+  { banco: 'BBVA',        nombre: 'BBVA Débito',          tipo: 'debito',  icono: '🏦', color: '#004481', packageName: 'co.com.bbva.mb' },
+  { banco: 'BBVA',        nombre: 'BBVA Crédito',         tipo: 'credito', icono: '💳', color: '#004481', packageName: 'co.com.bbva.mb' },
+  // ── Falabella ──
+  { banco: 'Falabella',   nombre: 'Falabella Crédito',    tipo: 'credito', icono: '💳', color: '#00693E', packageName: 'co.com.bancofalabella.mobile.omc' },
+  { banco: 'Falabella',   nombre: 'Falabella Débito',     tipo: 'debito',  icono: '🏦', color: '#00693E', packageName: 'co.com.bancofalabella.mobile.omc' },
+  // ── Banco de Bogotá ──
+  { banco: 'Banco de Bogotá', nombre: 'Bogotá Débito',   tipo: 'debito',  icono: '🏦', color: '#003087', packageName: 'com.bancodebogota.bancamovil' },
+  { banco: 'Banco de Bogotá', nombre: 'Bogotá Crédito',  tipo: 'credito', icono: '💳', color: '#003087', packageName: 'com.bancodebogota.bancamovil' },
+  // ── AV Villas ──
+  { banco: 'AV Villas',   nombre: 'AV Villas Débito',     tipo: 'debito',  icono: '🏦', color: '#78BE20', packageName: 'com.grupoavalav1.bancamovil' },
+  { banco: 'AV Villas',   nombre: 'AV Villas Crédito',    tipo: 'credito', icono: '💳', color: '#78BE20', packageName: 'com.grupoavalav1.bancamovil' },
+  // ── Banco de Occidente ──
+  { banco: 'Banco de Occidente', nombre: 'Occidente Débito',  tipo: 'debito',  icono: '🏦', color: '#0057A8', packageName: 'com.grupoavaloc1.bancamovil' },
+  { banco: 'Banco de Occidente', nombre: 'Occidente Crédito', tipo: 'credito', icono: '💳', color: '#0057A8', packageName: 'com.grupoavaloc1.bancamovil' },
+  // ── Banco Caja Social ──
+  { banco: 'Banco Caja Social', nombre: 'Caja Social Débito',  tipo: 'debito',  icono: '🏦', color: '#F05A28', packageName: 'com.bcs.retail' },
+  { banco: 'Banco Caja Social', nombre: 'Caja Social Crédito', tipo: 'credito', icono: '💳', color: '#F05A28', packageName: 'com.bcs.retail' },
+  // ── Scotiabank Colpatria ──
+  { banco: 'Scotiabank Colpatria', nombre: 'Colpatria Débito',  tipo: 'debito',  icono: '🏦', color: '#EC111A', packageName: '' },
+  { banco: 'Scotiabank Colpatria', nombre: 'Colpatria Crédito', tipo: 'credito', icono: '💳', color: '#EC111A', packageName: '' },
+  // ── Banco Popular ──
+  { banco: 'Banco Popular', nombre: 'Popular Débito',  tipo: 'debito',  icono: '🏦', color: '#005A9C', packageName: '' },
+  { banco: 'Banco Popular', nombre: 'Popular Crédito', tipo: 'credito', icono: '💳', color: '#005A9C', packageName: '' },
+  // ── Itaú ──
+  { banco: 'Itaú', nombre: 'Itaú Débito',  tipo: 'debito',  icono: '🏦', color: '#FF6200', packageName: '' },
+  { banco: 'Itaú', nombre: 'Itaú Crédito', tipo: 'credito', icono: '💳', color: '#FF6200', packageName: '' },
+  // ── Lulo Bank ──
+  { banco: 'Lulo Bank', nombre: 'Lulo Bank', tipo: 'debito', icono: '📱', color: '#FF5B5B', packageName: '' },
+  // ── Movii ──
+  { banco: 'Movii', nombre: 'Movii', tipo: 'debito', icono: '📱', color: '#F5C300', packageName: '' },
+  // ── RappiPay ──
+  { banco: 'RappiPay', nombre: 'RappiPay Cuenta',  tipo: 'debito',  icono: '📱', color: '#FF0000', packageName: '' },
+  { banco: 'RappiPay', nombre: 'RappiPay Crédito', tipo: 'credito', icono: '💳', color: '#FF0000', packageName: '' },
+  // ── Efectivo ──
+  { banco: 'Efectivo', nombre: 'Efectivo', tipo: 'debito', icono: '💵', color: '#22c55e', packageName: '' },
+]
+
+function PresetsModal({
+  onSeleccionar,
+  onClose,
+}: {
+  onSeleccionar: (preset: PresetBancario) => void
+  onClose: () => void
+}) {
+  const [filtro, setFiltro] = useState('')
+  const bancos = [...new Set(PRESETS_BANCARIOS.map(p => p.banco))]
+  const bancosFiltrados = filtro
+    ? bancos.filter(b => b.toLowerCase().includes(filtro.toLowerCase()))
+    : bancos
+
+  return (
+    <Modal title="Seleccionar banco" onClose={onClose}>
+      <input
+        placeholder="Buscar banco…"
+        value={filtro}
+        onChange={e => setFiltro(e.target.value)}
+        className="mb-3 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600"
+        autoFocus
+      />
+      <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+        {bancosFiltrados.map(banco => {
+          const opciones = PRESETS_BANCARIOS.filter(p => p.banco === banco)
+          return (
+            <div key={banco}>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{banco}</p>
+              <div className="flex flex-wrap gap-2">
+                {opciones.map(preset => (
+                  <button
+                    key={preset.nombre}
+                    onClick={() => onSeleccionar(preset)}
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:border-emerald-400 active:scale-95 dark:border-slate-700"
+                  >
+                    <span
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-base shrink-0"
+                      style={{ backgroundColor: preset.color + '22', color: preset.color }}
+                    >
+                      {preset.icono}
+                    </span>
+                    <span className="text-slate-700 dark:text-slate-200">
+                      {preset.tipo === 'debito' ? 'Débito' : 'Crédito'}
+                    </span>
+                    {!preset.packageName && (
+                      <span className="text-[10px] text-slate-400">(sin app)</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </Modal>
   )
 }
 

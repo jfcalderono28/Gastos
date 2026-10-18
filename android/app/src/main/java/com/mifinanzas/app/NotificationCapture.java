@@ -15,16 +15,82 @@ import java.util.ArrayList;
 
 public class NotificationCapture extends NotificationListenerService {
 
-    private static final String PREFS_NAME = "notif_captures";
-    private static final String PREFS_KEY  = "captures";
-    private static final int    MAX_CAPTURES = 100;
+    private static final String PREFS_NAME    = "notif_captures";
+    private static final String PREFS_KEY     = "captures";
+    private static final String PREFS_ALLOWED = "allowed_packages";
+    private static final int    MAX_CAPTURES  = 100;
 
     // In-memory cache; SharedPreferences is the source of truth across restarts
     public static final ArrayList<JSONObject> captures = new ArrayList<>();
+    public static final java.util.Set<String> allowedPackages = new java.util.HashSet<>();
     public static NotificationPlugin pluginRef = null;
+    public static NotificationCapture serviceInstance = null;
+
+    /** Returns true if this package should be captured. */
+    public static boolean isAllowed(String pkg) {
+        return allowedPackages.contains(pkg);
+    }
+
+    /** Called from JS whenever bolsillos change. Persists the whitelist. */
+    public static void setAllowedPackages(android.content.Context ctx, java.util.Set<String> pkgs) {
+        allowedPackages.clear();
+        allowedPackages.addAll(pkgs);
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (String p : pkgs) arr.put(p);
+            ctx.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+               .edit().putString(PREFS_ALLOWED, arr.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    /** Restores the whitelist from disk (called on app start). */
+    public static void loadAllowedPackages(android.content.Context ctx) {
+        try {
+            String saved = ctx.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+                              .getString(PREFS_ALLOWED, "[]");
+            org.json.JSONArray arr = new org.json.JSONArray(saved);
+            allowedPackages.clear();
+            for (int i = 0; i < arr.length(); i++) allowedPackages.add(arr.getString(i));
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onListenerConnected() { serviceInstance = this; }
+
+    @Override
+    public void onListenerDisconnected() { serviceInstance = null; }
+
+    /** Re-emite las notificaciones actualmente visibles en la barra como eventos JS. */
+    public static void scanActiveNotifications() {
+        if (serviceInstance == null || pluginRef == null) return;
+        for (android.service.notification.StatusBarNotification sbn : serviceInstance.getActiveNotifications()) {
+            if (!isAllowed(sbn.getPackageName())) continue;
+            try {
+                android.app.Notification n = sbn.getNotification();
+                android.os.Bundle extras = n.extras;
+                String title   = extras.getString(android.app.Notification.EXTRA_TITLE, "");
+                CharSequence textCs    = extras.getCharSequence(android.app.Notification.EXTRA_TEXT);
+                String text    = textCs != null ? textCs.toString() : "";
+                CharSequence bigTextCs = extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT);
+                String bigText = bigTextCs != null ? bigTextCs.toString() : "";
+                String body    = text.isEmpty() ? bigText : text;
+                String contentId = sbn.getPackageName() + "|" + title + "|" + body + "|" + (sbn.getPostTime() / 60000);
+                JSONObject obj = new JSONObject();
+                obj.put("id", contentId);
+                obj.put("packageName", sbn.getPackageName());
+                obj.put("title", title);
+                obj.put("text", body);
+                obj.put("subText", extras.getString(android.app.Notification.EXTRA_SUB_TEXT, ""));
+                obj.put("timestamp", sbn.getPostTime());
+                pluginRef.onNewCapture(obj);
+            } catch (JSONException ignored) {}
+        }
+    }
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        // Only process packages the user has linked to a bolsillo
+        if (!NotificationCapture.isAllowed(sbn.getPackageName())) return;
         try {
             Notification n = sbn.getNotification();
             Bundle extras = n.extras;
