@@ -12,6 +12,8 @@ export interface NotifCapture {
 export interface NotificationCapturePlugin {
   isPermissionGranted(): Promise<{ granted: boolean }>
   openSettings(): Promise<void>
+  isBatteryOptimized(): Promise<{ optimized: boolean }>
+  requestBatteryExemption(): Promise<void>
   getCaptures(): Promise<{ captures: NotifCapture[] }>
   clearCaptures(): Promise<void>
   addListener(

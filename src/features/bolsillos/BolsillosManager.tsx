@@ -158,6 +158,18 @@ export default function BolsillosManager({ onVolver }: { onVolver: () => void })
 
 const ICONOS = ['👛', '💵', '💳', '🏦', '📱', '🐷', '💰', '🎯']
 
+const APPS_BANCARIAS = [
+  { value: '', label: 'Ninguna' },
+  { value: 'com.nequi.MobileApp',                   label: 'Nequi' },
+  { value: 'co.com.bancolombia.personas.superapp',   label: 'Bancolombia' },
+  { value: 'com.nu.production',                      label: 'Nu (Nubank)' },
+  { value: 'com.todo1.davivienda.mobileapp',         label: 'Davivienda' },
+  { value: 'com.davivienda.daviplataapp',            label: 'Daviplata' },
+  { value: 'co.com.bbva.mb',                        label: 'BBVA' },
+  { value: 'co.com.bancofalabella.mobile.omc',       label: 'Falabella' },
+  { value: 'com.whatsapp',                           label: 'WhatsApp (pruebas)' },
+]
+
 function BolsilloEditor({
   inicial,
   totalBolsillos,
@@ -172,6 +184,7 @@ function BolsilloEditor({
   const [color, setColor] = useState(inicial?.color ?? '#10b981')
   const [tipo, setTipo] = useState<'debito' | 'credito'>(inicial?.tipo ?? 'debito')
   const [diaCorte, setDiaCorte] = useState(inicial?.diaCorte ? String(inicial.diaCorte) : '15')
+  const [packageName, setPackageName] = useState(inicial?.packageName ?? '')
 
   const valido = nombre.trim().length > 0 && (tipo === 'debito' || (Number(diaCorte) >= 1 && Number(diaCorte) <= 31))
 
@@ -179,6 +192,7 @@ function BolsilloEditor({
     if (!valido) return
     const datos: any = { nombre: nombre.trim(), icono, color, tipo }
     if (tipo === 'credito') datos.diaCorte = Number(diaCorte)
+    datos.packageName = packageName || undefined
     if (inicial?.id) await repo.updateBolsillo(inicial.id, datos)
     else await repo.addBolsillo(datos)
     onClose()
@@ -223,6 +237,22 @@ function BolsilloEditor({
             />
           </label>
         )}
+
+        <label className="block">
+          <span className="mb-1 block text-sm text-slate-500 dark:text-slate-400">App bancaria (para captura automática)</span>
+          <select
+            value={packageName}
+            onChange={(e) => setPackageName(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-black dark:border-slate-600"
+          >
+            {APPS_BANCARIAS.map(a => (
+              <option key={a.value} value={a.value} className="text-black">{a.label}</option>
+            ))}
+          </select>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Las notificaciones de esta app se registrarán en este bolsillo.
+          </p>
+        </label>
 
         <div>
           <span className="mb-1 block text-sm text-slate-500 dark:text-slate-400">Ícono</span>

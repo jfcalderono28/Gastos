@@ -92,6 +92,23 @@ export interface Bolsillo {
   tipo?: 'debito' | 'credito'
   diaCorte?: number
   orden?: number
+  packageName?: string  // app bancaria vinculada (ej. 'com.nequi.MobileApp')
+}
+
+/** Notificación bancaria capturada, clasificada y pendiente de registrar. */
+export interface CapturaNotif {
+  id?: number
+  capturaId: string              // id de la notificación original (para dedup)
+  packageName: string
+  bolsilloId: number
+  bolsilloTipo: 'debito' | 'credito'
+  monto: number
+  tipo: 'ingreso' | 'gasto' | 'ambiguo'
+  descripcion: string            // "título: texto" de la notificación
+  timestamp: number
+  estado: 'pendiente' | 'aceptado' | 'descartado'
+  transaccionId?: number
+  deudaId?: number
 }
 
 export interface Setting {
@@ -108,6 +125,7 @@ export class FinanzasDB extends Dexie {
   bolsillos!: Table<Bolsillo, number>
   settings!: Table<Setting, string>
   listaMercado!: Table<ListaMercado, number>
+  capturasNotif!: Table<CapturaNotif, number>
 
   constructor() {
     super('mi-finanzas')
@@ -150,6 +168,11 @@ export class FinanzasDB extends Dexie {
     this.version(8).stores({
       listaMercado: '++id, fecha',
       transactions: '++id, tipo, fecha, categoriaId, extId, bolsilloId, listaId',
+    })
+    // v9: packageName en bolsillos + tabla de capturas de notificaciones
+    this.version(9).stores({
+      bolsillos: '++id, packageName',
+      capturasNotif: '++id, capturaId, estado, bolsilloId, timestamp',
     })
   }
 }

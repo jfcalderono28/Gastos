@@ -6,7 +6,7 @@ import ObligacionesManager from '../obligatorios/ObligacionesManager'
 import Modal from '../../components/Modal'
 import { repo } from '../../data/repository'
 import { seedSiPrimeraVez } from '../../data/seed'
-import { DEFAULT_ORDER, FLASHBAR_ITEMS, useAhorroId, useAhorroPct, useBolsillos, useBolsillosSaldos, useComprasActivo, useMoneda, useSaldoInicial, useTransactions } from '../../hooks/data'
+import { DEFAULT_ORDER, FLASHBAR_ITEMS, useAhorroId, useAhorroPct, useBolsillos, useBolsillosSaldos, useCapturasNotifPendientesCount, useComprasActivo, useMoneda, useSaldoInicial, useTransactions } from '../../hooks/data'
 import type { FlashBarItem } from '../../hooks/data'
 import { formatMoney } from '../../lib/format'
 import { hoyISO } from '../../lib/dates'
@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const [coloresTx, setColoresTx] = useState(false)
   const [ayuda, setAyuda] = useState(false)
   const [captureNotifs, setCaptureNotifs] = useState(false)
+  const pendientesCount = useCapturasNotifPendientesCount()
   const ahorroId = useAhorroId()
   const ahorroPct = useAhorroPct()
   const comprasActivo = useComprasActivo()
@@ -47,7 +48,12 @@ export default function SettingsPage() {
         <Opcion icono="💾" texto="Exportar respaldo (CSV)" onClick={exportarRespaldo} />
         <Opcion icono="↕️" texto="Ordenar barra superior" onClick={() => setOrdenarBarra(true)} />
         <Opcion icono="🎨" texto="Colores de movimientos" onClick={() => setColoresTx(true)} />
-        <Opcion icono="🔔" texto="Captura de notificaciones" onClick={() => setCaptureNotifs(true)} />
+        <Opcion
+          icono="🔔"
+          texto="Captura de notificaciones"
+          badge={pendientesCount > 0 ? pendientesCount : undefined}
+          onClick={() => setCaptureNotifs(true)}
+        />
       </ul>
 
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm dark:divide-slate-700 dark:bg-slate-800">
@@ -856,11 +862,13 @@ function Opcion({
   texto,
   onClick,
   peligro,
+  badge,
 }: {
   icono: string
   texto: string
   onClick: () => void
   peligro?: boolean
+  badge?: number
 }) {
   return (
     <li>
@@ -872,6 +880,11 @@ function Opcion({
       >
         <span className="text-xl">{icono}</span>
         <span className="flex-1">{texto}</span>
+        {badge !== undefined && (
+          <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            {badge}
+          </span>
+        )}
         <span className="text-slate-300">›</span>
       </button>
     </li>

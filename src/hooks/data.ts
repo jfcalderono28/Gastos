@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../data/db'
 import { repo } from '../data/repository'
 
 /**
@@ -90,6 +91,22 @@ export function useFlashBarModoDisponible(): boolean {
 
 export function useListasMercado() {
   return useLiveQuery(() => repo.getListasMercado(), [], [])
+}
+
+export function useCapturasNotifPendientes() {
+  return useLiveQuery(
+    () => db.capturasNotif.where('estado').equals('pendiente').reverse().sortBy('timestamp'),
+    [],
+    [],
+  )
+}
+
+export function useCapturasNotifPendientesCount(): number {
+  return useLiveQuery(
+    () => db.capturasNotif.where('estado').equals('pendiente').count(),
+    [],
+    0,
+  ) ?? 0
 }
 
 export function useComprasActivo(): boolean {

@@ -1,4 +1,4 @@
-import { db, type Transaction, type Category, type Budget, type Debt, type Obligacion, type Bolsillo, type ListaMercado } from './db'
+import { db, type Transaction, type Category, type Budget, type Debt, type Obligacion, type Bolsillo, type ListaMercado, type CapturaNotif } from './db'
 
 /**
  * Capa de acceso a datos. La UI SIEMPRE habla con esta interfaz, nunca con
@@ -54,6 +54,11 @@ export interface Repository {
   addListaMercado(l: Omit<ListaMercado, 'id'>): Promise<number>
   updateListaMercado(id: number, cambios: Partial<ListaMercado>): Promise<void>
   deleteListaMercado(id: number): Promise<void>
+
+  // Capturas de notificaciones
+  addCapturaNotif(c: Omit<CapturaNotif, 'id'>): Promise<number | null>
+  getCapturasNotif(estado?: CapturaNotif['estado']): Promise<CapturaNotif[]>
+  updateCapturaNotif(id: number, cambios: Partial<CapturaNotif>): Promise<void>
 
   // Borra TODOS los datos (movimientos, categorías, presupuestos y ajustes)
   borrarTodo(): Promise<void>
@@ -185,10 +190,26 @@ class LocalRepository implements Repository {
     await db.listaMercado.delete(id)
   }
 
+  // Capturas de notificaciones
+  async addCapturaNotif(c: Omit<CapturaNotif, 'id'>): Promise<number | null> {
+    const existing = await db.capturasNotif.where('capturaId').equals(c.capturaId).first()
+    if (existing) return null
+    return db.capturasNotif.add(c as CapturaNotif)
+  }
+  getCapturasNotif(estado?: CapturaNotif['estado']) {
+    const col = estado
+      ? db.capturasNotif.where('estado').equals(estado)
+      : db.capturasNotif.orderBy('timestamp')
+    return col.reverse().toArray()
+  }
+  async updateCapturaNotif(id: number, cambios: Partial<CapturaNotif>) {
+    await db.capturasNotif.update(id, cambios)
+  }
+
   async borrarTodo() {
     await db.transaction(
       'rw',
-      [db.transactions, db.categories, db.budgets, db.debts, db.obligaciones, db.bolsillos, db.settings, db.listaMercado],
+      [db.transactions, db.categories, db.budgets, db.debts, db.obligaciones, db.bolsillos, db.settings, db.listaMercado, db.capturasNotif],
       async () => {
         await db.transactions.clear()
         await db.categories.clear()
@@ -198,6 +219,7 @@ class LocalRepository implements Repository {
         await db.bolsillos.clear()
         await db.settings.clear()
         await db.listaMercado.clear()
+        await db.capturasNotif.clear()
       },
     )
   }

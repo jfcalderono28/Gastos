@@ -10,8 +10,10 @@ import ComprasPage from './features/compras/ComprasPage'
 import { migrarBolsillos, seedSiPrimeraVez } from './data/seed'
 import { mesActual } from './lib/dates'
 import { useCategories, useComprasActivo, useTransactions } from './hooks/data'
+import { useNotificationProcessor } from './hooks/useNotificationProcessor'
 
 export default function App() {
+  useNotificationProcessor()
   const [tab, setTab] = useState<Tab>('movimientos')
   const [mes, setMes] = useState(mesActual())
   const comprasActivo = useComprasActivo()

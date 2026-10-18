@@ -2,6 +2,8 @@ package com.mifinanzas.app;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.net.Uri;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.text.TextUtils;
 
@@ -20,9 +22,10 @@ public class NotificationPlugin extends Plugin {
     @Override
     public void load() {
         NotificationCapture.pluginRef = this;
+        // Restore captures from disk if the process was restarted
+        NotificationCapture.loadFromPrefs(getContext());
     }
 
-    /** Returns whether the user has granted Notification Listener access to this app. */
     @PluginMethod
     public void isPermissionGranted(PluginCall call) {
         JSObject ret = new JSObject();
@@ -30,7 +33,6 @@ public class NotificationPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    /** Opens the system Notification Access settings screen. */
     @PluginMethod
     public void openSettings(PluginCall call) {
         Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
@@ -39,9 +41,37 @@ public class NotificationPlugin extends Plugin {
         call.resolve();
     }
 
-    /** Returns all captures collected since the service started. */
+    /** Returns whether the app is exempted from battery optimization. */
+    @PluginMethod
+    public void isBatteryOptimized(PluginCall call) {
+        PowerManager pm = (PowerManager) getContext().getSystemService(android.content.Context.POWER_SERVICE);
+        boolean ignoring = pm != null && pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
+        JSObject ret = new JSObject();
+        ret.put("optimized", !ignoring); // true = still being optimized (bad)
+        call.resolve(ret);
+    }
+
+    /** Opens the system dialog to request battery optimization exemption. */
+    @PluginMethod
+    public void requestBatteryExemption(PluginCall call) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(intent);
+        } catch (Exception e) {
+            // Fallback: open generic battery settings
+            Intent fallback = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(fallback);
+        }
+        call.resolve();
+    }
+
     @PluginMethod
     public void getCaptures(PluginCall call) {
+        // loadFromPrefs is a no-op if already loaded; covers edge cases
+        NotificationCapture.loadFromPrefs(getContext());
         JSArray arr = new JSArray();
         for (JSONObject obj : NotificationCapture.captures) {
             arr.put(obj);
@@ -51,14 +81,12 @@ public class NotificationPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    /** Clears all stored captures. */
     @PluginMethod
     public void clearCaptures(PluginCall call) {
-        NotificationCapture.captures.clear();
+        NotificationCapture.clearAll(getContext());
         call.resolve();
     }
 
-    /** Called by NotificationCapture service when a new notification arrives. */
     public void onNewCapture(JSONObject capture) {
         JSObject data = new JSObject();
         try {
