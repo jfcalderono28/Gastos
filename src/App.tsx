@@ -7,9 +7,10 @@ import BudgetsPage from './features/budgets/BudgetsPage'
 import ReportsPage from './features/reports/ReportsPage'
 import SettingsPage from './features/settings/SettingsPage'
 import ComprasPage from './features/compras/ComprasPage'
+import SimuladorPage from './features/simulador/SimuladorPage'
 import { migrarBolsillos, seedSiPrimeraVez } from './data/seed'
 import { mesActual } from './lib/dates'
-import { useCategories, useComprasActivo, useTransactions } from './hooks/data'
+import { useCategories, useComprasActivo, useSimuladorActivo, useTransactions } from './hooks/data'
 import { useNotificationProcessor } from './hooks/useNotificationProcessor'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('movimientos')
   const [mes, setMes] = useState(mesActual())
   const comprasActivo = useComprasActivo()
+  const simuladorActivo = useSimuladorActivo()
 
   useEffect(() => {
     seedSiPrimeraVez().then(() => migrarBolsillos())
@@ -29,12 +31,13 @@ export default function App() {
         <BannerSaldoInicial />
         {tab === 'movimientos' && <TransactionsPage mes={mes} setMes={setMes} />}
         {tab === 'deudas' && <DebtsPage />}
-        {tab === 'presupuestos' && <BudgetsPage mes={mes} setMes={setMes} />}
+        {tab === 'presupuestos' && !simuladorActivo && <BudgetsPage mes={mes} setMes={setMes} />}
+        {tab === 'presupuestos' && simuladorActivo && <SimuladorPage />}
         {tab === 'reportes' && <ReportsPage mes={mes} setMes={setMes} />}
         {tab === 'ajustes' && <SettingsPage />}
         {tab === 'compras' && <ComprasPage />}
       </main>
-      <BottomNav tab={tab} setTab={setTab} comprasActivo={comprasActivo} />
+      <BottomNav tab={tab} setTab={setTab} comprasActivo={comprasActivo} simuladorActivo={simuladorActivo} />
     </div>
   )
 }

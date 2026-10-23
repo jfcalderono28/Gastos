@@ -118,6 +118,11 @@ export function useComprasActivo(): boolean {
   return v === '1'
 }
 
+export function useSimuladorActivo(): boolean {
+  const v = useLiveQuery(() => repo.getSetting('simuladorActivo'), [], '0') ?? '0'
+  return v === '1'
+}
+
 /** Saldo actual de cada bolsillo débito (excluye crédito y ahorro). */
 export function useBolsillosSaldos(): Map<number, number> {
   const bolsillos = useBolsillos()

@@ -4,7 +4,7 @@ import ObligacionesManager from '../obligatorios/ObligacionesManager'
 import Modal from '../../components/Modal'
 import { repo } from '../../data/repository'
 import { seedSiPrimeraVez } from '../../data/seed'
-import { DEFAULT_ORDER, FLASHBAR_ITEMS, useAhorroId, useAhorroPct, useBolsillos, useBolsillosSaldos, useCapturasNotifPendientesCount, useComprasActivo, useMoneda, useSaldoInicial, useTransactions } from '../../hooks/data'
+import { DEFAULT_ORDER, FLASHBAR_ITEMS, useAhorroId, useAhorroPct, useBolsillos, useBolsillosSaldos, useCapturasNotifPendientesCount, useComprasActivo, useMoneda, useSaldoInicial, useSimuladorActivo, useTransactions } from '../../hooks/data'
 import type { FlashBarItem } from '../../hooks/data'
 import { formatMoney } from '../../lib/format'
 import { hoyISO } from '../../lib/dates'
@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const ahorroId = useAhorroId()
   const ahorroPct = useAhorroPct()
   const comprasActivo = useComprasActivo()
+  const simuladorActivo = useSimuladorActivo()
 
   if (vista === 'categorias') return <CategoriesManager onVolver={() => setVista('menu')} />
   if (vista === 'obligatorios') return <ObligacionesManager onVolver={() => setVista('menu')} />
@@ -67,7 +68,21 @@ export default function SettingsPage() {
           icono="🛒"
           texto="Compras"
           detalle={comprasActivo ? 'Activo · reemplaza Presupuestos' : 'Inactivo'}
-          onClick={async () => { await repo.setSetting('comprasActivo', comprasActivo ? '0' : '1') }}
+          onClick={async () => {
+            const activar = !comprasActivo
+            await repo.setSetting('comprasActivo', activar ? '1' : '0')
+            if (activar) await repo.setSetting('simuladorActivo', '0')
+          }}
+        />
+        <OpcionConDetalle
+          icono="🎚️"
+          texto="Simulador de presupuesto"
+          detalle={simuladorActivo ? 'Activo · reemplaza Presupuestos' : 'Inactivo'}
+          onClick={async () => {
+            const activar = !simuladorActivo
+            await repo.setSetting('simuladorActivo', activar ? '1' : '0')
+            if (activar) await repo.setSetting('comprasActivo', '0')
+          }}
         />
       </ul>
 
