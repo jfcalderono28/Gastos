@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Modal from '../../components/Modal'
 import { NotificationCapture, type NotifCapture } from '../../plugins/NotificationCapture'
-import { useCapturasNotifPendientes, useCategories, useBolsillos } from '../../hooks/data'
+import { useCapturasNotifPendientes, useCapturasNotifHistorial, useCategories, useBolsillos } from '../../hooks/data'
 import { repo } from '../../data/repository'
 import type { CapturaNotif } from '../../data/db'
 import { formatMoney } from '../../lib/format'
+import { procesarCaptura } from '../../hooks/useNotificationProcessor'
 
 // ── Raw capture helpers ────────────────────────────────────────────────────
 
@@ -78,6 +79,11 @@ function TipoBadge({ tipo }: { tipo: CapturaNotif['tipo'] }) {
       ↓ gasto
     </span>
   )
+  if (tipo === 'transferencia') return (
+    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+      ⇄ retiro cajero
+    </span>
+  )
   return (
     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
       ? ambiguo
@@ -91,9 +97,10 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
 
   // ── Transacción ──────────────────────────────────────────────────────────
   const [tipoSel, setTipoSel] = useState<'ingreso' | 'gasto'>(
-    captura.tipo === 'ambiguo' ? 'gasto' : captura.tipo,
+    captura.tipo === 'ambiguo' || captura.tipo === 'transferencia' ? 'gasto' : captura.tipo,
   )
   const [categoriaSel, setCategoriaSel] = useState<number | ''>('')
+  const [subcatTxSel, setSubcatTxSel] = useState('')
 
   // ── Deuda opcional (débito) o deuda principal (crédito) ──────────────────
   const [registrarDeuda, setRegistrarDeuda] = useState(false)
@@ -107,16 +114,26 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
   const bolsillos = useBolsillos()
   const bolsillo = bolsillos.find(b => b.id === captura.bolsilloId)
   const esCredito = captura.bolsilloTipo === 'credito'
+  const esTransferencia = captura.tipo === 'transferencia'
+
+  // ── Transferencia: bolsillo destino (default: efectivo o primer bolsillo distinto) ──
+  const bolsilloEfectivoId = bolsillos.find(
+    b => b.id !== captura.bolsilloId && /efectivo|cash|billetera/i.test(b.nombre)
+  )?.id ?? bolsillos.find(b => b.id !== captura.bolsilloId)?.id
+  const [transferDestId, setTransferDestId] = useState<number | ''>(bolsilloEfectivoId ?? '')
 
   const categsFiltradas = categorias.filter(c => c.tipo === tipoSel)
   const categsGasto = categorias.filter(c => c.tipo === 'gasto')
+  const subcatsTx = categsFiltradas.find(c => c.id === Number(categoriaSel))?.subcategorias ?? []
   const subcats = categsGasto.find(c => c.id === Number(categDeudaSel))?.subcategorias ?? []
   const montoCuota = esCuotas && Number(numCuotas) > 0 ? captura.monto / Number(numCuotas) : captura.monto
 
   // ingreso → yo debo (me prestaron) | gasto → me deben (les presté)
   const tipoDeudaImplied: 'debo' | 'me_deben' = tipoSel === 'gasto' ? 'me_deben' : 'debo'
 
-  const puedeConfirmar = esCredito
+  const puedeConfirmar = esTransferencia
+    ? Boolean(transferDestId)
+    : esCredito
     ? nombreDeuda.trim().length > 0
     : Boolean(categoriaSel) && (!registrarDeuda || nombreDeuda.trim().length > 0)
 
@@ -125,15 +142,35 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
     setLoading(true)
     try {
       let txId: number | undefined
+      let txDestinoId: number | undefined
       let deudaId: number | undefined
+      const fecha = new Date(captura.timestamp).toISOString().slice(0, 10)
 
-      if (!esCredito) {
+      if (esTransferencia) {
+        // Gasto desde el bolsillo origen (ej. Nequi)
+        txId = await repo.addTransaction({
+          tipo: 'gasto',
+          monto: captura.monto,
+          fecha,
+          bolsilloId: captura.bolsilloId,
+          nota: captura.descripcion,
+        })
+        // Ingreso al bolsillo destino (ej. efectivo)
+        txDestinoId = await repo.addTransaction({
+          tipo: 'ingreso',
+          monto: captura.monto,
+          fecha,
+          bolsilloId: Number(transferDestId),
+          nota: captura.descripcion,
+        })
+      } else if (!esCredito) {
         // Siempre registrar la transacción en débito
         txId = await repo.addTransaction({
           tipo: tipoSel,
           monto: captura.monto,
-          fecha: new Date(captura.timestamp).toISOString().slice(0, 10),
+          fecha,
           categoriaId: Number(categoriaSel),
+          subcategoria: subcatTxSel || undefined,
           bolsilloId: captura.bolsilloId,
           nota: captura.descripcion,
         })
@@ -145,7 +182,7 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
           tipo_deuda: esCredito ? 'debo' : tipoDeudaImplied,
           nombre: nombreDeuda.trim(),
           montoTotal: captura.monto,
-          fechaCreacion: new Date(captura.timestamp).toISOString().slice(0, 10),
+          fechaCreacion: fecha,
           esCuotas: cuotas,
           numCuotas: cuotas ? Number(numCuotas) : undefined,
           montoCuota: cuotas ? Math.round(captura.monto / Number(numCuotas)) : undefined,
@@ -156,7 +193,13 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
         })
       }
 
-      await repo.updateCapturaNotif(captura.id, { estado: 'aceptado', transaccionId: txId, deudaId })
+      await repo.updateCapturaNotif(captura.id, {
+        estado: 'aceptado',
+        transaccionId: txId,
+        transaccionDestinoId: txDestinoId,
+        deudaId,
+        fechaAccion: Date.now(),
+      })
     } finally {
       setLoading(false)
     }
@@ -164,7 +207,7 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
 
   async function descartar() {
     if (!captura.id) return
-    await repo.updateCapturaNotif(captura.id, { estado: 'descartado' })
+    await repo.updateCapturaNotif(captura.id, { estado: 'descartado', fechaAccion: Date.now() })
   }
 
   // Sub-formulario de deuda (compartido entre crédito y el toggle de débito)
@@ -279,7 +322,30 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
       ) : (
         <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 dark:border-slate-700">
 
-          {esCredito ? (
+          {esTransferencia ? (
+            /* Transferencia: selector de bolsillo destino */
+            <div className="space-y-3 rounded-xl bg-indigo-50 p-3 dark:bg-indigo-950/30">
+              <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400">
+                ⇄ Retiro en cajero — transferencia entre bolsillos
+              </p>
+              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <span className="rounded-lg bg-white px-2 py-1 font-medium shadow-sm dark:bg-slate-800">
+                  {bolsillo?.icono} {bolsillo?.nombre ?? friendlyPackage(captura.packageName)}
+                </span>
+                <span className="text-slate-400">→</span>
+                <select
+                  value={transferDestId}
+                  onChange={e => setTransferDestId(Number(e.target.value))}
+                  className="flex-1 rounded-lg border border-indigo-200 bg-white px-2 py-1 text-slate-800 dark:border-indigo-800 dark:bg-slate-800 dark:text-white"
+                >
+                  <option value="">Seleccionar destino…</option>
+                  {bolsillos.filter(b => b.id !== captura.bolsilloId).map(b => (
+                    <option key={b.id} value={b.id} className="text-black">{b.icono} {b.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : esCredito ? (
             /* Crédito: solo deuda */
             formDeuda
           ) : (
@@ -293,7 +359,7 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
                     {(['ingreso', 'gasto'] as const).map(t => (
                       <button
                         key={t}
-                        onClick={() => { setTipoSel(t); setCategoriaSel('') }}
+                        onClick={() => { setTipoSel(t); setCategoriaSel(''); setSubcatTxSel('') }}
                         className={`flex-1 rounded-lg py-1.5 text-xs font-semibold border transition-colors ${
                           tipoSel === t
                             ? t === 'ingreso' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-600 text-white border-rose-600'
@@ -312,13 +378,28 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
                 <span className="text-xs text-slate-500">Categoría</span>
                 <select
                   value={categoriaSel}
-                  onChange={e => setCategoriaSel(Number(e.target.value))}
+                  onChange={e => { setCategoriaSel(Number(e.target.value)); setSubcatTxSel('') }}
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-1.5 text-sm text-slate-800 dark:text-white dark:border-slate-600"
                 >
                   <option value="">Seleccionar…</option>
                   {categsFiltradas.map(c => <option key={c.id} value={c.id} className="text-black">{c.nombre}</option>)}
                 </select>
               </label>
+
+              {/* Subcategoría de la transacción */}
+              {subcatsTx.length > 0 && (
+                <label className="block">
+                  <span className="text-xs text-slate-500">Subcategoría</span>
+                  <select
+                    value={subcatTxSel}
+                    onChange={e => setSubcatTxSel(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-1.5 text-sm text-slate-800 dark:text-white dark:border-slate-600"
+                  >
+                    <option value="">Sin subcategoría</option>
+                    {subcatsTx.map(s => <option key={s} value={s} className="text-black">{s}</option>)}
+                  </select>
+                </label>
+              )}
 
               {/* Toggle: también registrar deuda */}
               <div className="flex items-center justify-between">
@@ -359,6 +440,64 @@ function CapturaCard({ captura }: { captura: CapturaNotif }) {
   )
 }
 
+// ── Historial card ─────────────────────────────────────────────────────────
+
+function HistorialCard({ captura }: { captura: CapturaNotif }) {
+  const bolsillos = useBolsillos()
+  const bolsillo = bolsillos.find(b => b.id === captura.bolsilloId)
+  const aceptado = captura.estado === 'aceptado'
+  const fechaTs = captura.fechaAccion ?? captura.timestamp
+
+  function formatFecha(ts: number) {
+    const diff = Math.floor((Date.now() - ts) / 1000)
+    if (diff < 60) return `hace ${diff}s`
+    if (diff < 3600) return `hace ${Math.floor(diff / 60)}min`
+    if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`
+    return new Date(ts).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+  }
+
+  return (
+    <li className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${
+      aceptado
+        ? 'border-emerald-100 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+        : 'border-slate-100 bg-slate-50/50 dark:border-slate-700/50 dark:bg-slate-800/20'
+    }`}>
+      <span className={`mt-0.5 text-base shrink-0 ${aceptado ? 'text-emerald-500' : 'text-slate-400'}`}>
+        {aceptado ? '✓' : '✗'}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+            {formatMoney(captura.monto)}
+          </span>
+          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+            {friendlyPackage(captura.packageName)}
+          </span>
+          {bolsillo && (
+            <span className="text-[10px] text-slate-400">→ {bolsillo.icono} {bolsillo.nombre}</span>
+          )}
+        </div>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 truncate">{captura.descripcion}</p>
+        <div className="mt-1 flex items-center gap-2 flex-wrap">
+          <span className={`text-[10px] font-medium ${aceptado ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+            {aceptado ? 'Registrado' : 'Descartado'} · {formatFecha(fechaTs)}
+          </span>
+          {aceptado && captura.transaccionId && (
+            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+              transacción #{captura.transaccionId}
+            </span>
+          )}
+          {aceptado && captura.deudaId && (
+            <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+              deuda #{captura.deudaId}
+            </span>
+          )}
+        </div>
+      </div>
+    </li>
+  )
+}
+
 // ── Main modal ─────────────────────────────────────────────────────────────
 
 export default function CaptureNotificationsModal({ onClose }: { onClose: () => void }) {
@@ -367,6 +506,8 @@ export default function CaptureNotificationsModal({ onClose }: { onClose: () => 
   const [captures, setCaptures] = useState<NotifCapture[]>([])
   const listenerRef = useRef<{ remove: () => void } | null>(null)
   const pendientes = useCapturasNotifPendientes()
+  const historial = useCapturasNotifHistorial()
+  const [verHistorial, setVerHistorial] = useState(false)
 
   useEffect(() => {
     NotificationCapture.getCaptures().then(r => {
@@ -396,6 +537,7 @@ export default function CaptureNotificationsModal({ onClose }: { onClose: () => 
   }, [])
 
   const [scanning, setScanning] = useState(false)
+  const bolsillos = useBolsillos()
 
   function handleClear() {
     NotificationCapture.clearCaptures().catch(() => {})
@@ -405,7 +547,20 @@ export default function CaptureNotificationsModal({ onClose }: { onClose: () => 
   async function handleScanActive() {
     setScanning(true)
     try {
+      // Java persists new captures to SharedPreferences and fires events
       await NotificationCapture.scanActiveNotifications()
+      // Fetch the updated capture list (includes newly persisted ones)
+      const { captures: raw } = await NotificationCapture.getCaptures()
+      const sorted = [...raw].reverse()
+      setCaptures(dedupe(sorted))
+      // Process directly — don't rely solely on the notificationReceived event path,
+      // which can miss captures if the listener is momentarily being re-registered.
+      const mapped = bolsillos.filter(b => b.packageName)
+      if (mapped.length > 0) {
+        for (const c of sorted) {
+          await procesarCaptura(c, mapped).catch(() => {})
+        }
+      }
     } finally {
       setTimeout(() => setScanning(false), 1500)
     }
@@ -480,6 +635,28 @@ export default function CaptureNotificationsModal({ onClose }: { onClose: () => 
           <ul className="space-y-2">
             {pendientes.map(c => <CapturaCard key={c.id} captura={c} />)}
           </ul>
+        </div>
+      )}
+
+      {/* History of processed notifications */}
+      {historial.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setVerHistorial(v => !v)}
+            className="flex w-full items-center justify-between mb-2"
+          >
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Historial ({historial.length})
+            </p>
+            <span className="text-xs text-slate-400">{verHistorial ? '▲ ocultar' : '▼ ver'}</span>
+          </button>
+          {verHistorial && (
+            <ul className="space-y-1.5">
+              {historial.map(c => (
+                <HistorialCard key={c.id} captura={c} />
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

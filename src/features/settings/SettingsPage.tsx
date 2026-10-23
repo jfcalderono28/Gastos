@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Papa from 'papaparse'
 import CategoriesManager from '../categories/CategoriesManager'
-import ImportPage from '../import/ImportPage'
 import ObligacionesManager from '../obligatorios/ObligacionesManager'
 import Modal from '../../components/Modal'
 import { repo } from '../../data/repository'
@@ -14,7 +12,7 @@ import { hoyISO } from '../../lib/dates'
 import BolsillosManager from '../bolsillos/BolsillosManager'
 import CaptureNotificationsModal from './CaptureNotificationsModal'
 
-type Vista = 'menu' | 'categorias' | 'importar' | 'obligatorios' | 'bolsillos'
+type Vista = 'menu' | 'categorias' | 'obligatorios' | 'bolsillos'
 
 export default function SettingsPage() {
   const [vista, setVista] = useState<Vista>('menu')
@@ -31,7 +29,6 @@ export default function SettingsPage() {
   const comprasActivo = useComprasActivo()
 
   if (vista === 'categorias') return <CategoriesManager onVolver={() => setVista('menu')} />
-  if (vista === 'importar') return <ImportPage onVolver={() => setVista('menu')} />
   if (vista === 'obligatorios') return <ObligacionesManager onVolver={() => setVista('menu')} />
   if (vista === 'bolsillos') return <BolsillosManager onVolver={() => setVista('menu')} />
 
@@ -44,8 +41,7 @@ export default function SettingsPage() {
         <Opcion icono="👛" texto="Bolsillos" onClick={() => setVista('bolsillos')} />
         <Opcion icono="🏷️" texto="Categorías" onClick={() => setVista('categorias')} />
         <Opcion icono="📌" texto="Gastos obligatorios" onClick={() => setVista('obligatorios')} />
-        <Opcion icono="📥" texto="Importar desde CSV" onClick={() => setVista('importar')} />
-        <Opcion icono="💾" texto="Exportar respaldo (CSV)" onClick={exportarRespaldo} />
+        {/* Importar/Exportar CSV oculto */}
         <Opcion icono="↕️" texto="Ordenar barra superior" onClick={() => setOrdenarBarra(true)} />
         <Opcion icono="🎨" texto="Colores de movimientos" onClick={() => setColoresTx(true)} />
         <Opcion
@@ -567,34 +563,6 @@ function ConfirmarBorrado({ onClose }: { onClose: () => void }) {
   )
 }
 
-async function exportarRespaldo() {
-  const [txs, cats] = await Promise.all([repo.getTransactions(), repo.getCategories()])
-  const nombre = new Map(cats.map((c) => [c.id, c.nombre]))
-  const filas = txs.map((t) => ({
-    fecha: t.fecha,
-    tipo: t.tipo,
-    monto: t.monto,
-    categoria: nombre.get(t.categoriaId) ?? '',
-    nota: t.nota ?? '',
-  }))
-  const csv = Papa.unparse(filas)
-  const filename = `respaldo-finanzas-${new Date().toISOString().slice(0, 10)}.csv`
-  const file = new File([csv], filename, { type: 'text/csv;charset=utf-8' })
-
-  // En Android (Capacitor) usar Web Share API con archivo
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    await navigator.share({ files: [file], title: filename })
-    return
-  }
-
-  // Fallback para navegador web
-  const url = URL.createObjectURL(file)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 function ConfigurarAhorro({
   ahorroIdActual,

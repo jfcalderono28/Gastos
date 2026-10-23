@@ -26,8 +26,12 @@ function extractAmount(title: string, text: string): number {
   return 0
 }
 
-function clasificar(title: string, text: string): 'ingreso' | 'gasto' | 'ambiguo' {
+function clasificar(title: string, text: string): 'ingreso' | 'gasto' | 'ambiguo' | 'transferencia' {
   const full = `${title} ${text}`.toLowerCase()
+
+  // ── TRANSFERENCIA (retiro en cajero = dinero propio a efectivo) ───────────
+  // "sacaste" (Nequi: "Sacaste $20000") o "retiro en cajero"
+  if (/sacaste|retiro\s+en\s+cajero/.test(full)) return 'transferencia'
 
   // ── GASTO (outgoing money) — check first, more specific patterns ──────────
   // "le enviaste", "que enviaste", "envío exitoso", "envío de plata exitoso"
@@ -68,7 +72,7 @@ function clasificar(title: string, text: string): 'ingreso' | 'gasto' | 'ambiguo
   return 'ambiguo'
 }
 
-async function procesarCaptura(
+export async function procesarCaptura(
   capture: { id: string; packageName: string; title?: string; text?: string; timestamp: number },
   mapped: Array<{ id?: number; packageName?: string; tipo?: string }>,
 ) {

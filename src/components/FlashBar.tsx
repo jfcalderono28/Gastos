@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal'
 import { repo } from '../data/repository'
-import { useAhorroId, useAhorroPct, useBolsillos, useCategories, useDebts, useFlashBarHidden, useFlashBarModoDisponible, useFlashBarModoFijos, useFlashBarOrder, useMoneda, useObligaciones, useSaldoInicial, useSueldo, useTransactions } from '../hooks/data'
+import { useAhorroId, useAhorroPct, useBolsillos, useCapturasNotifPendientesCount, useCategories, useDebts, useFlashBarHidden, useFlashBarModoDisponible, useFlashBarModoFijos, useFlashBarOrder, useMoneda, useObligaciones, useSaldoInicial, useSueldo, useTransactions } from '../hooks/data'
 import type { FlashBarItem } from '../hooks/data'
+import CaptureNotificationsModal from '../features/settings/CaptureNotificationsModal'
 import { mesActual, sumarMeses } from '../lib/dates'
 import { formatMoney } from '../lib/format'
 import { montoEnMes, pendiente } from '../features/debts/calc'
@@ -21,8 +22,10 @@ export default function FlashBar() {
   const orden = useFlashBarOrder()
   const ocultos = useFlashBarHidden()
   const categorias = useCategories()
+  const notifCount = useCapturasNotifPendientesCount()
   const [editarSueldo, setEditarSueldo] = useState(false)
   const [detalleItem, setDetalleItem] = useState<FlashBarItem | null>(null)
+  const [mostrarCaptura, setMostrarCaptura] = useState(false)
   const [manualIdx, setManualIdx] = useState<number | null>(null)
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressedRef = useRef(false)
@@ -284,9 +287,29 @@ export default function FlashBar() {
 
   return (
     <>
-      <div className="sticky top-0 z-20 -mx-4 mb-3 flex items-center gap-0 overflow-x-auto border-b border-slate-200 bg-white/95 px-4 py-2 text-xs backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
-        {visibleItems.map((key, i) => renderItem(key, i === visibleItems.length - 1))}
+      <div className="sticky top-0 z-20 -mx-4 mb-3 flex items-center border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+        {/* Items scrollables */}
+        <div className="flex flex-1 items-center gap-0 overflow-x-auto px-4 py-2 text-xs">
+          {visibleItems.map((key, i) => renderItem(key, i === visibleItems.length - 1))}
+        </div>
+        {/* Campana — siempre visible, no scrollea */}
+        <button
+          onClick={() => setMostrarCaptura(true)}
+          className="relative mr-2 flex shrink-0 items-center justify-center rounded-full bg-white/50 dark:bg-slate-900/50 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+          style={{ width: 41, height: 40 }}
+        >
+          <span className="text-lg leading-none">🔔</span>
+          {notifCount > 0 && (
+            <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+              {notifCount > 9 ? '9+' : notifCount}
+            </span>
+          )}
+        </button>
       </div>
+
+      {mostrarCaptura && (
+        <CaptureNotificationsModal onClose={() => setMostrarCaptura(false)} />
+      )}
 
       {editarSueldo && (
         <EditarSueldo sueldo={sueldo} moneda={moneda} onClose={() => setEditarSueldo(false)} />

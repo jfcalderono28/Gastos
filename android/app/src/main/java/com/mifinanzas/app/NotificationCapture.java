@@ -60,7 +60,11 @@ public class NotificationCapture extends NotificationListenerService {
     @Override
     public void onListenerDisconnected() { serviceInstance = null; }
 
-    /** Re-emite las notificaciones actualmente visibles en la barra como eventos JS. */
+    /**
+     * Rescans notifications currently visible in the status bar.
+     * Persists new captures to SharedPreferences (same as onNotificationPosted)
+     * so getCaptures() picks them up. Also fires events for the JS processor.
+     */
     public static void scanActiveNotifications() {
         if (serviceInstance == null || pluginRef == null) return;
         for (android.service.notification.StatusBarNotification sbn : serviceInstance.getActiveNotifications()) {
@@ -75,6 +79,15 @@ public class NotificationCapture extends NotificationListenerService {
                 String bigText = bigTextCs != null ? bigTextCs.toString() : "";
                 String body    = text.isEmpty() ? bigText : text;
                 String contentId = sbn.getPackageName() + "|" + title + "|" + body + "|" + (sbn.getPostTime() / 60000);
+
+                // Skip if already in in-memory captures (already persisted)
+                boolean alreadySaved = false;
+                for (JSONObject existing : captures) {
+                    try {
+                        if (contentId.equals(existing.getString("id"))) { alreadySaved = true; break; }
+                    } catch (JSONException ignored2) {}
+                }
+
                 JSONObject obj = new JSONObject();
                 obj.put("id", contentId);
                 obj.put("packageName", sbn.getPackageName());
@@ -82,6 +95,15 @@ public class NotificationCapture extends NotificationListenerService {
                 obj.put("text", body);
                 obj.put("subText", extras.getString(android.app.Notification.EXTRA_SUB_TEXT, ""));
                 obj.put("timestamp", sbn.getPostTime());
+
+                if (!alreadySaved) {
+                    // Persist to SharedPreferences so getCaptures() returns it
+                    if (captures.size() >= MAX_CAPTURES) captures.remove(0);
+                    captures.add(obj);
+                    serviceInstance.persistCapture(obj);
+                }
+
+                // Always fire event so JS processor can handle it
                 pluginRef.onNewCapture(obj);
             } catch (JSONException ignored) {}
         }
@@ -131,7 +153,7 @@ public class NotificationCapture extends NotificationListenerService {
     }
 
     /** Appends one capture to the SharedPreferences JSON array. */
-    private void persistCapture(JSONObject obj) {
+    void persistCapture(JSONObject obj) {
         try {
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             JSONArray arr = loadArray(prefs);

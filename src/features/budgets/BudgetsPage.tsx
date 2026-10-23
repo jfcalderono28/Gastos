@@ -48,7 +48,7 @@ export default function BudgetsPage({
     const m = new Map<number, number>()
     transacciones
       .filter((t) => t.tipo === 'gasto' && esDelMes(t.fecha, mes))
-      .forEach((t) => m.set(t.categoriaId, (m.get(t.categoriaId) ?? 0) + t.monto))
+      .forEach((t) => { if (t.categoriaId != null) m.set(t.categoriaId, (m.get(t.categoriaId) ?? 0) + t.monto) })
     return m
   }, [transacciones, mes])
 

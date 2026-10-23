@@ -58,6 +58,7 @@ export interface Repository {
   // Capturas de notificaciones
   addCapturaNotif(c: Omit<CapturaNotif, 'id'>): Promise<number | null>
   getCapturasNotif(estado?: CapturaNotif['estado']): Promise<CapturaNotif[]>
+  getCapturasNotifHistorial(): Promise<CapturaNotif[]>
   updateCapturaNotif(id: number, cambios: Partial<CapturaNotif>): Promise<void>
 
   // Borra TODOS los datos (movimientos, categorías, presupuestos y ajustes)
@@ -201,6 +202,12 @@ class LocalRepository implements Repository {
       ? db.capturasNotif.where('estado').equals(estado)
       : db.capturasNotif.orderBy('timestamp')
     return col.reverse().toArray()
+  }
+  async getCapturasNotifHistorial(): Promise<CapturaNotif[]> {
+    const all = await db.capturasNotif
+      .where('estado').anyOf(['aceptado', 'descartado'])
+      .toArray()
+    return all.sort((a, b) => (b.fechaAccion ?? b.timestamp) - (a.fechaAccion ?? a.timestamp))
   }
   async updateCapturaNotif(id: number, cambios: Partial<CapturaNotif>) {
     await db.capturasNotif.update(id, cambios)

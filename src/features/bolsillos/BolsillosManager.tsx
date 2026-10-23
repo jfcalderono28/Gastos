@@ -1,8 +1,62 @@
 import { useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import Modal from '../../components/Modal'
 import { repo } from '../../data/repository'
 import type { Bolsillo } from '../../data/db'
 import { useBolsillos } from '../../hooks/data'
+import { NotificationCapture } from '../../plugins/NotificationCapture'
+
+function useAppIcon(packageName: string | undefined): string | null {
+  const [icon, setIcon] = useState<string | null>(null)
+  useEffect(() => {
+    if (!packageName || !Capacitor.isNativePlatform()) return
+    let cancelled = false
+    NotificationCapture.getAppIcon({ packageName })
+      .then(r => { if (!cancelled && r.icon) setIcon(r.icon) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [packageName])
+  return icon
+}
+
+function BolsilloIcon({
+  packageName,
+  emoji,
+  size = 'md',
+  color,
+}: {
+  packageName?: string
+  emoji: string
+  size?: 'sm' | 'md'
+  color?: string
+}) {
+  const icon = useAppIcon(packageName)
+  const dim = size === 'sm' ? 'h-7 w-7' : 'h-9 w-9'
+  if (icon) {
+    return (
+      <img
+        src={icon}
+        alt=""
+        className={`${dim} shrink-0 rounded-full object-cover`}
+      />
+    )
+  }
+  if (size === 'sm' && color) {
+    return (
+      <span
+        className={`flex ${dim} items-center justify-center rounded-full text-base shrink-0`}
+        style={{ backgroundColor: color + '22', color }}
+      >
+        {emoji}
+      </span>
+    )
+  }
+  return (
+    <span className={`flex ${dim} shrink-0 items-center justify-center rounded-full text-lg bg-slate-200 dark:bg-slate-600`}>
+      {emoji}
+    </span>
+  )
+}
 
 export default function BolsillosManager({ onVolver }: { onVolver: () => void }) {
   const bolsillosDB = useBolsillos()
@@ -131,9 +185,7 @@ export default function BolsillosManager({ onVolver }: { onVolver: () => void })
                 >
                   ⠿
                 </span>
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg bg-slate-200 dark:bg-slate-600">
-                  {b.icono}
-                </span>
+                <BolsilloIcon packageName={b.packageName} emoji={b.icono} size="md" />
                 <span className="flex-1 cursor-pointer font-medium text-slate-800 dark:text-slate-100" onClick={() => setEditar(b)}>
                   {b.nombre}
                   <span className="ml-1 text-xs text-slate-400">{b.tipo === 'credito' ? '· crédito' : '· débito'}</span>
@@ -281,12 +333,7 @@ function PresetsModal({
                     onClick={() => onSeleccionar(preset)}
                     className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:border-emerald-400 active:scale-95 dark:border-slate-700"
                   >
-                    <span
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-base shrink-0"
-                      style={{ backgroundColor: preset.color + '22', color: preset.color }}
-                    >
-                      {preset.icono}
-                    </span>
+                    <BolsilloIcon packageName={preset.packageName || undefined} emoji={preset.icono} size="sm" color={preset.color} />
                     <span className="text-slate-700 dark:text-slate-200">
                       {preset.tipo === 'debito' ? 'Débito' : 'Crédito'}
                     </span>
@@ -365,7 +412,7 @@ function BolsilloEditor({
           <select
             value={tipo}
             onChange={(e) => setTipo(e.target.value as 'debito' | 'credito')}
-            className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-black dark:border-slate-600"
+            className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-slate-800 dark:text-white dark:border-slate-600"
           >
             <option value="debito" className="text-black">Contenedor de dinero (Débito, Efectivo)</option>
             <option value="credito" className="text-black">Crédito (Tarjeta de crédito)</option>
@@ -391,7 +438,7 @@ function BolsilloEditor({
           <select
             value={packageName}
             onChange={(e) => setPackageName(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-black dark:border-slate-600"
+            className="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-slate-800 dark:text-white dark:border-slate-600"
           >
             {APPS_BANCARIAS.map(a => (
               <option key={a.value} value={a.value} className="text-black">{a.label}</option>
@@ -404,6 +451,21 @@ function BolsilloEditor({
 
         <div>
           <span className="mb-1 block text-sm text-slate-500 dark:text-slate-400">Ícono</span>
+          {/* Preview of what will actually appear in the list */}
+          <div className="mb-3 flex items-center gap-3 rounded-xl bg-slate-100 dark:bg-slate-700/50 px-4 py-3">
+            <BolsilloIcon packageName={packageName || undefined} emoji={icono} size="md" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-slate-800 dark:text-slate-100 truncate">
+                {nombre || 'Nombre del bolsillo'}
+              </p>
+              <p className="text-xs text-slate-400">
+                {packageName
+                  ? 'Ícono real de la app (si está instalada)'
+                  : 'Ícono emoji (sin app vinculada)'}
+              </p>
+            </div>
+          </div>
+          <p className="mb-2 text-xs text-slate-400">Ícono de respaldo (cuando la app no está instalada):</p>
           <div className="flex flex-wrap gap-2">
             {ICONOS.map((i) => (
               <button

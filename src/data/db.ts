@@ -16,7 +16,7 @@ export interface Transaction {
   tipo: TipoMovimiento
   monto: number
   fecha: string // ISO 'YYYY-MM-DD'
-  categoriaId: number
+  categoriaId?: number
   subcategoria?: string
   nota?: string
   extId?: string // id de origen (CSV) para evitar duplicados al reimportar
@@ -103,11 +103,13 @@ export interface CapturaNotif {
   bolsilloId: number
   bolsilloTipo: 'debito' | 'credito'
   monto: number
-  tipo: 'ingreso' | 'gasto' | 'ambiguo'
+  tipo: 'ingreso' | 'gasto' | 'ambiguo' | 'transferencia'
   descripcion: string            // "título: texto" de la notificación
   timestamp: number
   estado: 'pendiente' | 'aceptado' | 'descartado'
+  fechaAccion?: number              // timestamp cuando se aceptó o descartó
   transaccionId?: number
+  transaccionDestinoId?: number     // solo para transferencias: tx de ingreso al bolsillo destino
   deudaId?: number
 }
 

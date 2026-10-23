@@ -101,6 +101,10 @@ export function useCapturasNotifPendientes() {
   )
 }
 
+export function useCapturasNotifHistorial() {
+  return useLiveQuery(() => repo.getCapturasNotifHistorial(), []) ?? []
+}
+
 export function useCapturasNotifPendientesCount(): number {
   return useLiveQuery(
     () => db.capturasNotif.where('estado').equals('pendiente').count(),

@@ -18,6 +18,7 @@ export interface NotificationCapturePlugin {
   clearCaptures(): Promise<void>
   setAllowedPackages(options: { packages: string[] }): Promise<void>
   scanActiveNotifications(): Promise<void>
+  getAppIcon(options: { packageName: string }): Promise<{ icon?: string }>
   addListener(
     event: 'notificationReceived',
     fn: (capture: NotifCapture) => void,

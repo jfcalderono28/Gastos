@@ -44,7 +44,7 @@ export default function ReportsPage({
     return ids
   }, [categorias])
 
-  const esTransferencia = (t: Transaction) => idsTransferencia.has(t.categoriaId)
+  const esTransferencia = (t: Transaction) => t.categoriaId != null && idsTransferencia.has(t.categoriaId)
 
   const bolsillosDebito = useMemo(
     () => bolsillos.filter((b) => b.tipo !== 'credito'),
@@ -65,7 +65,7 @@ export default function ReportsPage({
     const m = new Map<number, number>()
     base
       .filter((t) => t.tipo === 'gasto' && esDelMes(t.fecha, mes))
-      .forEach((t) => m.set(t.categoriaId, (m.get(t.categoriaId) ?? 0) + t.monto))
+      .forEach((t) => { if (t.categoriaId != null) m.set(t.categoriaId, (m.get(t.categoriaId) ?? 0) + t.monto) })
     return [...m.entries()]
       .map(([categoriaId, valor]) => ({
         categoriaId,
