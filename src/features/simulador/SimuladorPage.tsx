@@ -50,49 +50,26 @@ function calcularPromedios(
 
 // ── Slider ─────────────────────────────────────────────────────────────────────
 
-function ReglaSlider({ promedio, valor, onChange, max }: {
-  promedio: number; valor: number; onChange: (v: number) => void; max: number
+function ReglaSlider({ promedio, valor, max }: {
+  promedio: number; valor: number; max: number
 }) {
-  const trackRef = useRef<HTMLDivElement>(null)
   const pctPromedio = max > 0 ? Math.min(100, (promedio / max) * 100) : 0
   const pctValor = max > 0 ? Math.min(100, (valor / max) * 100) : 0
-
-  const getValor = useCallback((clientX: number) => {
-    const rect = trackRef.current?.getBoundingClientRect()
-    if (!rect) return valor
-    return Math.round(Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * max)
-  }, [max, valor])
-
-  const onMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault()
-    onChange(getValor(e.clientX))
-    const mv = (ev: MouseEvent) => onChange(getValor(ev.clientX))
-    const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up) }
-    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up)
-  }
-  const onTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault()
-    onChange(getValor(e.touches[0].clientX))
-    const mv = (ev: TouchEvent) => onChange(getValor(ev.touches[0].clientX))
-    const end = () => { window.removeEventListener('touchmove', mv); window.removeEventListener('touchend', end) }
-    window.addEventListener('touchmove', mv, { passive: false }); window.addEventListener('touchend', end)
-  }
   const bajo = valor <= promedio
   return (
-    <div ref={trackRef} className="relative h-7 cursor-pointer select-none" onMouseDown={onMouseDown} onTouchStart={onTouchStart}>
+    <div className="relative h-4 select-none pointer-events-none">
       <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-slate-200 dark:bg-slate-700" />
       <div className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full transition-none" style={{ left: 0, width: `${pctValor}%`, backgroundColor: bajo ? '#10b981' : '#ef4444' }} />
-      <div className="absolute top-0 h-7 w-0.5 rounded-full bg-slate-500 dark:bg-slate-400" style={{ left: `${pctPromedio}%`, transform: 'translateX(-50%)' }} />
-      <div className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md transition-none" style={{ left: `${pctValor}%`, backgroundColor: bajo ? '#10b981' : '#ef4444' }} />
+      <div className="absolute top-0 h-4 w-0.5 rounded-full bg-slate-500 dark:bg-slate-400" style={{ left: `${pctPromedio}%`, transform: 'translateX(-50%)' }} />
     </div>
   )
 }
 
 // ── Fila categoría ─────────────────────────────────────────────────────────────
 
-function FilaCategoria({ icono, nombre, promedio, mesesProm, valor, onChange, sueldo, moneda, max, indent = false, onTapValue }: {
+function FilaCategoria({ icono, nombre, promedio, mesesProm, valor, sueldo, moneda, max, indent = false, onTapValue }: {
   icono: string; nombre: string; promedio: number; mesesProm: number; valor: number
-  onChange: (v: number) => void; sueldo: number; moneda: string; max: number; indent?: boolean
+  onChange?: (v: number) => void; sueldo: number; moneda: string; max: number; indent?: boolean
   onTapValue?: () => void
 }) {
   const pctS = sueldo > 0 ? Math.round((valor / sueldo) * 100) : 0
@@ -112,7 +89,7 @@ function FilaCategoria({ icono, nombre, promedio, mesesProm, valor, onChange, su
         </button>
         {sueldo > 0 && <span className="text-[11px] text-slate-400 w-9 text-right">{pctS}%</span>}
       </div>
-      <ReglaSlider promedio={promedio} valor={valor} onChange={onChange} max={max} />
+      <ReglaSlider promedio={promedio} valor={valor} max={max} />
       <div className="mt-0.5 flex items-center justify-between text-[10px] text-slate-400">
         <span>Prom. {formatMoney(promedio, moneda)}{sueldo > 0 && ` · ${pctP}%`}{mesesProm > 0 && <span className="ml-1 opacity-70">({mesesProm} {mesesProm === 1 ? 'mes' : 'meses'})</span>}</span>
         {diff !== 0 && <span className={bajo ? 'text-emerald-500' : 'text-red-400'}>{bajo ? '▼' : '▲'} {formatMoney(Math.abs(diff), moneda)}</span>}
